@@ -1,0 +1,27 @@
+# VariDub sidecar 依赖 —— CUDA 12.1 版（SPEC-001 §7.4「Python 3.11 + torch(CUDA 12.x) + demucs + MuseTalk」）
+#
+# 安装：pip install -r requirements.txt（主进程「本地算力引导」会先试本文件，
+#       失败自动回退 requirements-cpu.txt，保证功能可跑通）
+#
+# 说明：
+# * torch 锁 cu121 构建；GTX 1660 Ti 属 Turing（sm_75），cu121 覆盖。
+# * MuseTalk 不在 PyPI：代码需自行 clone（见 sidecar/README.md），权重用
+#   download_models.py 拉取。缺它只影响步骤⑥的口型环节——会跳过并仍产出成片。
+# * 权重 URL 一律不写死在这里：交由 demucs / huggingface_hub 取官方源，
+#   避免版本演进后 URL 失效。
+
+# 人声分离（步骤② Demucs）
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.4.1+cu121
+torchaudio==2.4.1+cu121
+demucs>=4.0.1,<5
+
+# 数值依赖：demucs 传递依赖较多，这里只做上界收敛
+numpy>=1.26,<2.3
+einops>=0.7,<1
+
+# 嘴部定位（可选）：缺失时 /detect_mouth 返回 501，步骤⑥回退默认嘴部框
+opencv-python>=4.10,<5
+
+# MuseTalk 权重下载（可选）：缺失时 download_models.py --which musetalk 会给出提示
+huggingface-hub>=0.25,<1

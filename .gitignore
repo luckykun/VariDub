@@ -1,0 +1,16 @@
+node_modules/
+out/
+release/
+
+# 量界面 / 验接口的暂存脚本与产物（数据目录、curl 落盘、asar 解包），不入库也不打包
+.measure/
+
+# sidecar 的 Python 环境与缓存属于用户机器，不入库
+sidecar/.venv/
+sidecar/.bootstrap-note
+**/__pycache__/
+*.pyc
+
+*.log
+.DS_Store
+Thumbs.db

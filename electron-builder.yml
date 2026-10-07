@@ -1,0 +1,88 @@
+# electron-builder 配置（SPEC-001 §7.2 打包 / §7.4 目录结构）
+# 关键约束：
+# 1) ffmpeg-static 的二进制在 asar 内无法直接 CreateProcess，better-sqlite3 是原生模块 —— 都要 asarUnpack；
+#    主进程 media/ffmpeg.ts 会把 app.asar 路径归一化成 app.asar.unpacked。
+# 2) sidecar 与 prompts 走 extraResources 放到 install 根级的 resources/ 下，
+#    对应 paths.ts / sidecar/manager.ts 里「打包后取 process.resourcesPath」的分支。
+# 3) Python 环境不随包分发（体积与 GPU 驱动绑定），首次运行由设置页「一键引导」或 scripts/setup-sidecar.ps1 建 venv。
+
+appId: com.varidub.desktop
+productName: VariDub
+copyright: VariDub（综译）
+directories:
+  output: release
+  buildResources: build
+
+# 默认 ** 全收，这里只做减法：源码与开发期目录不进包，运行期需要的东西走 extraResources
+# 注意：out/ 不只有构建产物 —— 量界面时写的暂存（数据目录 / 日志 / 截图）一旦落在 out/ 就会被打进 asar，
+#       以 `!out/` 开头的三条就是防这个；量布局请写到仓库根的 .measure/（已排除）。
+files:
+  - '!**/*.md'
+  - '!**/*.map'
+  - '!src/**'
+  - '!specs/**'
+  - '!sidecar/**'
+  - '!resources/**'
+  - '!scripts/**'
+  - '!build/**'
+  - '!.measure/**'
+  - '!*.log'
+  - '!out/smoke/**'
+  - '!out/view/**'
+  - '!out/*.log'
+  - '!release/**'
+  - '!{electron.vite.config.ts,electron-builder.yml,drizzle.config.ts}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{.gitignore,.eslintrc.cjs,.prettierrc.yaml,dev-app-update.yml}'
+
+asar: true
+asarUnpack:
+  - '**/node_modules/ffmpeg-static/**'
+  - '**/node_modules/better-sqlite3/**'
+
+extraResources:
+  # 可编辑提示词（paths.ts: promptsDir() → resources/prompts/varidub/*.md）
+  - from: resources/prompts
+    to: prompts
+  # 应用图标（主进程 appIconPath() 的第一候选就是 resourcesPath/icon.png）
+  - from: resources/icon.png
+    to: icon.png
+  # Python 子进程源码目录：venv 与缓存留在用户机器上，不进包
+  - from: sidecar
+    to: sidecar
+    filter:
+      - '**/*'
+      - '!.venv/**'
+      - '!**/__pycache__/**'
+      - '!*.pyc'
+      - '!.bootstrap-note'
+
+# better-sqlite3 需要针对 Electron ABI 重新编译；postinstall 已跑 electron-builder install-app-deps
+npmRebuild: true
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+  # 自用工具不签证书；正式发布时替换为证书配置
+  forceCodeSigning: false
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  shortcutName: VariDub 综译
+  artifactName: ${productName}-${version}-Setup.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+  requestExecutionLevel: user
+
+publish: null

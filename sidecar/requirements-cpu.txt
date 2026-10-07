@@ -1,0 +1,17 @@
+# VariDub sidecar 依赖 —— CPU 兜底版（SPEC-001 §7.1 引导失败自动降级）
+#
+# 用途：CUDA 版 wheel 装不上（驱动/网络/源不可达）时，主进程会自动改用本文件重装，
+# 让 Demucs / 导出链路先跑通；速度会明显下降，是否值得继续本地跑由 §9 M0 实测结论决定。
+#
+# 与 requirements.txt 的差别只有 torch/torchaudio 走 PyPI 默认 CPU 构建。
+
+torch>=2.4.0
+torchaudio>=2.4.0
+demucs>=4.0.1,<5
+
+numpy>=1.26,<2.3
+einops>=0.7,<1
+
+# 可选：缺失不影响主链路
+opencv-python>=4.10,<5
+huggingface-hub>=0.25,<1

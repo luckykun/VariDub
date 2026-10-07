@@ -1,0 +1,249 @@
+/**
+ * 设计 token（SPEC-001 §7.6）——实现时唯一颜色来源。
+ * 设计稿提炼：深色 #181818 画布 + #303030 分层，主行动色 #DA291C，状态色语义固定。
+ * 直角为主，仅输入框 4px；无投影，用亮度分层。
+ *
+ * 明暗层级（不可反）：
+ * 1) 正常态一律黑（canvas #181818）：画布、顶栏/侧栏/底栏、卡片、按钮、输入框、徽章，
+ *    彼此靠 hairline 描边分层，不靠底色；
+ * 2) 灰（elevated #303030）只出现在「高亮相关」处：hover、选中/当前项、聚焦描边、滑杆与进度槽；
+ * 3) 状态色（绿完成/红当前与危险/黄待办/蓝信息）语义固定，不参与黑白灰层级。
+ */
+@import 'tailwindcss';
+
+@theme {
+  --color-canvas: #181818;
+  --color-elevated: #303030;
+  --color-hairline: #303030;
+  --color-ink: #ffffff;
+  /* 主文字（全站默认色，`text-body`）：原 #969696 长时间阅读费力，按用户反馈提一档到 #a8a8a8；
+     ink / body / muted 三档拉开的层次不变（muted 仍给标签与提示，不跟着提亮，否则层次塌成一档） */
+  --color-body: #a8a8a8;
+  --color-muted: #666666;
+  --color-accent: #da291c;
+  --color-success: #03904a;
+  --color-warn: #f6e500;
+  --color-error: #f13a2c;
+  --color-info: #4c98b9;
+
+  --font-ui: 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-display: 'Inter', 'Noto Sans SC', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+
+  --radius-input: 4px;
+  --spacing: 4px;
+
+  /* 单行控件统一高度：按钮 / 输入框 / 下拉框共用，并排时不再高低不齐 */
+  --control-h: 32px;
+
+  /* 卡片 Header 统一高度：标题有 12/13px 两档、右侧可能放徽章或行内小按钮，自然高度实测从 43 到 57 散开，
+     卡片并排时上描边线条对不齐。定高后内容垂直居中，最高的合法内容（一个 --control-h 按钮）仍容得下。 */
+  --panel-header-h: 48px;
+
+  /* 贴底横条统一高度：步骤工作区 Footer 与左侧菜单底栏共用同一个值，
+     两者的上描边才能在同一水平线上（Footer 原来随提示行数增高，侧栏底栏又是另一个值）。 */
+  --bar-h: 56px;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  select {
+    user-select: text;
+    background: var(--color-canvas);
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-input);
+    color: var(--color-ink);
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+  }
+
+  /* 下拉列表由 Chromium 自绘，不设 color-scheme 会出现白字白底 */
+  select option {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  /* 单行控件统一取 --control-h（靠 items 居中，不再用上下内边距撑高）；textarea 多行不参与 */
+  input:not([type='checkbox']):not([type='range']),
+  select {
+    height: var(--control-h);
+    padding-block: 0;
+  }
+
+  /* 文本框保持插入符光标，不被外层 label 的手指光标掩盖 */
+  input:not([type='checkbox']):not([type='range']),
+  textarea {
+    cursor: text;
+  }
+
+  /* 可点元素一律手指光标：未套 .btn 的自定义按钮（导航项 / Tab / 图标按钮）、
+     下拉、勾选框、滑杆，以及点一下就能聚焦控件的 label */
+  button:not(:disabled),
+  [role='button']:not(:disabled),
+  [role='tab']:not(:disabled),
+  a[href],
+  summary,
+  select,
+  input[type='checkbox'],
+  input[type='range'],
+  label:has(input),
+  label:has(select) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    border-color: var(--color-muted);
+  }
+
+  input[type='range'] {
+    appearance: none;
+    height: 4px;
+    padding: 0;
+    border: none;
+    background: var(--color-elevated);
+    border-radius: 0;
+  }
+
+  input[type='range']::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--color-accent);
+    border-radius: 9999px;
+    cursor: pointer;
+  }
+
+  input[type='checkbox'] {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 1px solid var(--color-muted);
+    border-radius: 2px;
+    background: var(--color-canvas);
+    cursor: pointer;
+  }
+
+  input[type='checkbox']:hover:not(:disabled) {
+    border-color: var(--color-body);
+  }
+
+  /* appearance:none 后 Chromium 不再自绘对勾，不补上就是一个实心红块（§7.6 白字红底）；
+     对勾按 10×10 视口设坐标，stroke-width 2 在 10px 图上刚好 1:1 不虚 */
+  input[type='checkbox']:checked {
+    border-color: var(--color-accent);
+    background: var(--color-accent)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M1.8 5.3L4 7.5 8.2 2.4'/%3E%3C/svg%3E")
+      no-repeat center / 10px 10px;
+  }
+
+  input[type='checkbox']:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-canvas);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-elevated);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-none border border-hairline bg-canvas px-4 text-ink transition-colors;
+    height: var(--control-h);
+  }
+
+  /* 紧凑按钮变体：卡片行内的小动作，不参与统一控件高度 */
+  .btn-sm {
+    @apply px-2 py-[3px] text-[11px];
+    height: auto;
+  }
+
+  /* 悬浮=高亮，才允许出现灰底（只给无主色的默认/幽灵按钮） */
+  .btn:hover:not(:disabled) {
+    border-color: var(--color-muted);
+    background: var(--color-elevated);
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .btn-accent {
+    @apply border-accent bg-accent text-ink;
+  }
+
+  /* 红色主按钮 hover 必须自己声明背景：它与 .btn:hover 同权重（都是类+2 个伪类），原来只声明了边框和提亮、
+     没声明背景，于是 .btn:hover 的灰底落到了红按钮上（鼠标一放就变灰）；反馈只靠提亮，不掉色。 */
+  .btn-accent:hover:not(:disabled) {
+    border-color: var(--color-accent);
+    background-color: var(--color-accent);
+    filter: brightness(1.15);
+  }
+
+  .btn-ghost {
+    @apply border-transparent bg-transparent text-body;
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    color: var(--color-ink);
+    border-color: var(--color-hairline);
+    background: var(--color-elevated);
+  }
+
+  .btn-danger {
+    @apply border-error text-error;
+  }
+
+  .card {
+    @apply border border-hairline bg-canvas;
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .label {
+    @apply text-[11px] tracking-wide text-muted uppercase;
+  }
+}
